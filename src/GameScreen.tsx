@@ -239,6 +239,7 @@ const GameScreen = ({ endGame, playerInfo }: { endGame: () => void; playerInfo: 
 
     window.addEventListener('keydown', handleKeyDown);
     canvas.addEventListener('mousedown', handleMouseDown);
+    canvas.addEventListener('touchstart', handleJump);
 
     let animationFrameId: number;
 
@@ -327,11 +328,8 @@ const GameScreen = ({ endGame, playerInfo }: { endGame: () => void; playerInfo: 
         playerRotation.current += 2;
       }
 
-      // Clear canvas with gradient background
-      const gradient = context.createLinearGradient(0, 0, 0, canvas.height);
-      gradient.addColorStop(0, '#e0f2fe');
-      gradient.addColorStop(1, '#bae6fd');
-      context.fillStyle = gradient;
+      // Clear canvas with a solid color for better performance
+      context.fillStyle = '#e0f2fe';
       context.fillRect(0, 0, canvas.width, canvas.height);
 
       // Draw ground
@@ -350,8 +348,6 @@ const GameScreen = ({ endGame, playerInfo }: { endGame: () => void; playerInfo: 
       
       if (invincible.current) {
         context.globalAlpha = 0.5 + Math.sin(Date.now() * 0.01) * 0.5;
-        context.shadowBlur = 20;
-        context.shadowColor = '#a855f7';
       }
       
       context.fillText('🦸‍♂️', 0, 0);
@@ -387,12 +383,12 @@ const GameScreen = ({ endGame, playerInfo }: { endGame: () => void; playerInfo: 
         const obstacleCenterX = obstacle.x + obstacle.width/2;
         const obstacleCenterY = obstacle.y + obstacle.height/2;
         
-        const distance = Math.sqrt(
-          Math.pow(playerCenterX - obstacleCenterX, 2) + 
-          Math.pow(playerCenterY - obstacleCenterY, 2)
-        );
-        
-        if (distance < PLAYER_SIZE/2 + obstacle.width/2 && !invincible.current) {
+        const dx = playerCenterX - obstacleCenterX;
+        const dy = playerCenterY - obstacleCenterY;
+        const distanceSq = dx * dx + dy * dy;
+        const collisionDistance = PLAYER_SIZE / 2 + obstacle.width / 2;
+
+        if (distanceSq < collisionDistance * collisionDistance && !invincible.current) {
           if (!submitted.current) {
             void addScore({
               name: playerInfo.name,
@@ -446,18 +442,16 @@ const GameScreen = ({ endGame, playerInfo }: { endGame: () => void; playerInfo: 
         context.font = '30px system-ui';
         context.textAlign = 'center';
         context.textBaseline = 'middle';
-        context.shadowBlur = 10;
-        context.shadowColor = '#fbbf24';
         context.fillText(collectible.emoji, collectible.x, floatY);
         context.restore();
         
-        // Collision detection
-        const distance = Math.sqrt(
-          Math.pow(PLAYER_X + PLAYER_SIZE/2 - collectible.x, 2) + 
-          Math.pow(playerY.current + PLAYER_SIZE/2 - floatY, 2)
-        );
-        
-        if (distance < PLAYER_SIZE/2 + 20) {
+        // Collision detection (using squared distance for performance)
+        const dx = PLAYER_X + PLAYER_SIZE / 2 - collectible.x;
+        const dy = playerY.current + PLAYER_SIZE / 2 - floatY;
+        const distanceSq = dx * dx + dy * dy;
+        const collisionDistance = PLAYER_SIZE / 2 + 20;
+
+        if (distanceSq < collisionDistance * collisionDistance) {
           collectible.collected = true;
           activatePowerUp(collectible.type);
         }
@@ -541,6 +535,7 @@ const GameScreen = ({ endGame, playerInfo }: { endGame: () => void; playerInfo: 
       cancelAnimationFrame(animationFrameId);
       window.removeEventListener('keydown', handleKeyDown);
       canvas.removeEventListener('mousedown', handleMouseDown);
+      canvas.removeEventListener('touchstart', handleJump);
     };
   }, [gameState, showInstructions, addScore, playerInfo, startGame, handleJump]);
 
