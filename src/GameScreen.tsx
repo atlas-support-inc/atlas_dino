@@ -14,6 +14,7 @@ const GameScreen = ({ endGame, playerInfo }: { endGame: () => void; playerInfo: 
   const obstacles = useRef<{ x: number; y: number; width: number; height: number; }[]>([]);
   const obstacleTimer = useRef(0);
   const obstacleSpawnInterval = useRef(120);
+  const submitted = useRef(false);
 
   const addScore = useMutation(api.myFunctions.addScore);
 
@@ -28,6 +29,7 @@ const GameScreen = ({ endGame, playerInfo }: { endGame: () => void; playerInfo: 
     obstacles.current = [];
     obstacleTimer.current = 0;
     obstacleSpawnInterval.current = 120;
+    submitted.current = false;
     setGameState('playing');
   }, []);
 
@@ -75,6 +77,10 @@ const GameScreen = ({ endGame, playerInfo }: { endGame: () => void; playerInfo: 
         return;
       }
 
+      // Update score and speed
+      score.current++;
+      gameSpeed.current = 5 + score.current / 250;
+
       // Update player
       playerVelocity.current += gravity;
       playerY.current += playerVelocity.current;
@@ -112,16 +118,20 @@ const GameScreen = ({ endGame, playerInfo }: { endGame: () => void; playerInfo: 
           playerY.current < obstacle.y + obstacle.height &&
           playerY.current + 50 > obstacle.y
         ) {
-          addScore({ name: playerInfo.name, email: playerInfo.email, score: score.current });
+          if (!submitted.current) {
+            addScore({
+              name: playerInfo.name,
+              email: playerInfo.email,
+              score: score.current,
+            });
+            submitted.current = true;
+          }
           setGameState('gameOver');
         }
 
         return obstacle.x + obstacle.width > 0;
       });
 
-      // Update score and speed
-      score.current++;
-      gameSpeed.current = 5 + score.current / 250;
 
       // Draw score
       context.fillStyle = 'black';
