@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+import { useRef, useEffect, useState, useCallback } from 'react';
 import { useMutation } from 'convex/react';
 import { api } from '../convex/_generated/api';
 
@@ -240,7 +240,7 @@ const GameScreen = ({ endGame, playerInfo }: { endGame: () => void; playerInfo: 
         context.save();
         context.translate(shakeX, shakeY);
         
-        context.fillStyle = 'rgba(0, 0, 0, 0.8)';
+        context.fillStyle = '#1e293b';
         context.fillRect(0, 0, canvas.width, canvas.height);
         
         context.fillStyle = 'white';
@@ -264,7 +264,7 @@ const GameScreen = ({ endGame, playerInfo }: { endGame: () => void; playerInfo: 
 
       // Show instructions
       if (showInstructions) {
-        context.fillStyle = 'rgba(0, 0, 0, 0.8)';
+        context.fillStyle = '#1e293b';
         context.fillRect(0, 0, canvas.width, canvas.height);
         
         context.fillStyle = 'white';
@@ -383,7 +383,7 @@ const GameScreen = ({ endGame, playerInfo }: { endGame: () => void; playerInfo: 
         
         if (distance < PLAYER_SIZE/2 + obstacle.width/2 && !invincible.current) {
           if (!submitted.current) {
-            addScore({
+            void addScore({
               name: playerInfo.name,
               email: playerInfo.email,
               score: score.current,

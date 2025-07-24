@@ -1,6 +1,5 @@
 import { v } from "convex/values";
 import { query, mutation } from "./_generated/server";
-import { api } from "./_generated/api";
 
 // Write your Convex functions in any file inside this directory (`convex`).
 // See https://docs.convex.dev/functions for more.
@@ -12,7 +11,7 @@ export const addScore = mutation({
     score: v.number(),
   },
   handler: async (ctx, args) => {
-    let player = await ctx.db
+    const player = await ctx.db
       .query("players")
       .withIndex("by_email", (q) => q.eq("email", args.email))
       .unique();

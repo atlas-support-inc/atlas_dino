@@ -1,9 +1,8 @@
 "use client";
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import HomeScreen from './HomeScreen';
 import GameScreen from './GameScreen';
-import { api } from "../convex/_generated/api";
 
 export default function App() {
   const [screen, setScreen] = useState('home');
@@ -20,8 +19,8 @@ export default function App() {
 
   return (
     <>
-      <header className="sticky top-0 z-10 bg-light dark:bg-dark p-4 border-b-2 border-slate-200 dark:border-slate-800">
-        Dino Runner
+      <header className="sticky top-0 z-10 bg-card p-4 border-b">
+        <h1 className="text-xl font-bold">Atlas Dino</h1>
       </header>
       <main className="p-8 flex flex-col gap-16">
         {screen === 'home' && <HomeScreen startGame={startGame} />}
