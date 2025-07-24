@@ -198,6 +198,28 @@ const GameScreen = ({ endGame, playerInfo }: { endGame: () => void; playerInfo: 
     startGame();
   }, [startGame]);
 
+  const handleJump = useCallback(() => {
+    if (gameState !== 'playing') return;
+
+    if (showInstructions) {
+      setShowInstructions(false);
+      return;
+    }
+
+    if (isGrounded.current) {
+      playerVelocity.current = JUMP_STRENGTH;
+      isGrounded.current = false;
+      canDoubleJump.current = true;
+      playerRotation.current = -15;
+      createParticles(PLAYER_X + PLAYER_SIZE / 2, playerY.current + PLAYER_SIZE, 5, '#60a5fa', 3);
+    } else if (canDoubleJump.current) {
+      playerVelocity.current = DOUBLE_JUMP_STRENGTH;
+      canDoubleJump.current = false;
+      playerRotation.current = -20;
+      createParticles(PLAYER_X + PLAYER_SIZE / 2, playerY.current + PLAYER_SIZE / 2, 8, '#818cf8', 4);
+    }
+  }, [gameState, showInstructions]);
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -205,29 +227,18 @@ const GameScreen = ({ endGame, playerInfo }: { endGame: () => void; playerInfo: 
     if (!context) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.code === 'Space' && gameState === 'playing') {
+      if (e.code === 'Space') {
         e.preventDefault();
-        if (showInstructions) {
-          setShowInstructions(false);
-          return;
-        }
-        
-        if (isGrounded.current) {
-          playerVelocity.current = JUMP_STRENGTH;
-          isGrounded.current = false;
-          canDoubleJump.current = true;
-          playerRotation.current = -15;
-          createParticles(PLAYER_X + PLAYER_SIZE/2, playerY.current + PLAYER_SIZE, 5, '#60a5fa', 3);
-        } else if (canDoubleJump.current) {
-          playerVelocity.current = DOUBLE_JUMP_STRENGTH;
-          canDoubleJump.current = false;
-          playerRotation.current = -20;
-          createParticles(PLAYER_X + PLAYER_SIZE/2, playerY.current + PLAYER_SIZE/2, 8, '#818cf8', 4);
-        }
+        handleJump();
       }
     };
 
+    const handleMouseDown = () => {
+      handleJump();
+    };
+
     window.addEventListener('keydown', handleKeyDown);
+    canvas.addEventListener('mousedown', handleMouseDown);
 
     let animationFrameId: number;
 
@@ -277,14 +288,14 @@ const GameScreen = ({ endGame, playerInfo }: { endGame: () => void; playerInfo: 
         
         context.font = '18px system-ui';
         context.fillText('🎮 Controls:', canvas.width / 2, 280);
-        context.fillText('SPACE - Jump (Press twice for double jump!)', canvas.width / 2, 310);
+        context.fillText('SPACE or CLICK - Jump (Press twice for double jump!)', canvas.width / 2, 310);
         
         context.fillText('🎯 Objectives:', canvas.width / 2, 370);
         context.fillText('😤 Avoid angry tickets   🐛 Dodge bugs   🚨 Skip escalations', canvas.width / 2, 400);
         context.fillText('😊 Collect happy customers for bonus points!', canvas.width / 2, 430);
         
         context.font = 'bold 24px system-ui';
-        context.fillText('Press SPACE to start!', canvas.width / 2, 500);
+        context.fillText('Press SPACE or CLICK to start!', canvas.width / 2, 500);
         
         animationFrameId = requestAnimationFrame(gameLoop);
         return;
@@ -529,8 +540,9 @@ const GameScreen = ({ endGame, playerInfo }: { endGame: () => void; playerInfo: 
     return () => {
       cancelAnimationFrame(animationFrameId);
       window.removeEventListener('keydown', handleKeyDown);
+      canvas.removeEventListener('mousedown', handleMouseDown);
     };
-  }, [gameState, showInstructions, addScore, playerInfo, startGame]);
+  }, [gameState, showInstructions, addScore, playerInfo, startGame, handleJump]);
 
   return (
     <div className="flex flex-col items-center gap-4">
