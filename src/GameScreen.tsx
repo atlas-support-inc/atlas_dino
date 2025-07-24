@@ -237,9 +237,14 @@ const GameScreen = ({ endGame, playerInfo }: { endGame: () => void; playerInfo: 
       handleJump();
     };
 
+    const handleTouchStart = (e: TouchEvent) => {
+      e.preventDefault();
+      handleJump();
+    };
+
     window.addEventListener('keydown', handleKeyDown);
     canvas.addEventListener('mousedown', handleMouseDown);
-    canvas.addEventListener('touchstart', handleJump);
+    canvas.addEventListener('touchstart', handleTouchStart);
 
     let animationFrameId: number;
 
@@ -535,7 +540,7 @@ const GameScreen = ({ endGame, playerInfo }: { endGame: () => void; playerInfo: 
       cancelAnimationFrame(animationFrameId);
       window.removeEventListener('keydown', handleKeyDown);
       canvas.removeEventListener('mousedown', handleMouseDown);
-      canvas.removeEventListener('touchstart', handleJump);
+      canvas.removeEventListener('touchstart', handleTouchStart);
     };
   }, [gameState, showInstructions, addScore, playerInfo, startGame, handleJump]);
 
