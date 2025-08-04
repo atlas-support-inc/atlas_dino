@@ -36,7 +36,6 @@ interface Obstacle {
 
 // Collectible types
 type CollectibleType =
-  | "happy_customer"
   | "automation"
   | "ai_assist"
   | "knowledge_base";
@@ -49,12 +48,7 @@ interface Collectible {
   collected: boolean;
 }
 
-// Power-up effects
-interface PowerUp {
-  type: CollectibleType;
-  duration: number;
-  active: boolean;
-}
+
 
 const GameScreen = ({
   endGame,
@@ -77,13 +71,11 @@ const GameScreen = ({
   const playerY = useRef(0);
   const playerVelocity = useRef(0);
   const score = useRef(0);
-  const ticketsResolved = useRef(0);
-  const customerSatisfaction = useRef(100);
   const gameSpeed = useRef(INITIAL_GAME_SPEED);
   const obstacles = useRef<Obstacle[]>([]);
   const collectibles = useRef<Collectible[]>([]);
   const particles = useRef<Particle[]>([]);
-  const powerUps = useRef<PowerUp[]>([]);
+
   const obstacleTimer = useRef(0);
   const collectibleTimer = useRef(0);
   const submitted = useRef(false);
@@ -98,10 +90,10 @@ const GameScreen = ({
   // Enhanced player state
   const canDoubleJump = useRef(true);
   const isGrounded = useRef(true);
-  const combo = useRef(0);
   const lastObstacleX = useRef(0);
   const invincible = useRef(false);
   const speedBoost = useRef(1);
+
 
   // Visual effects
   const screenShake = useRef(0);
@@ -157,14 +149,14 @@ const GameScreen = ({
   // Add collectible
   const addCollectible = () => {
     const types: { type: CollectibleType; emoji: string }[] = [
-      { type: "happy_customer", emoji: "😊" },
       { type: "automation", emoji: "🤖" },
       { type: "ai_assist", emoji: "🧠" },
       { type: "knowledge_base", emoji: "📚" },
     ];
 
     const collectibleConfig = types[Math.floor(Math.random() * types.length)];
-    const yPosition = canvasRef.current!.height - 150 - Math.random() * 200;
+    const yPosition =
+      canvasRef.current!.height - 100 - Math.random() * 150;
 
     collectibles.current.push({
       x: canvasRef.current!.width,
@@ -178,21 +170,6 @@ const GameScreen = ({
   // Handle power-up activation
   const activatePowerUp = (type: CollectibleType) => {
     switch (type) {
-      case "happy_customer":
-        customerSatisfaction.current = Math.min(
-          100,
-          customerSatisfaction.current + 20,
-        );
-        score.current += 500;
-        createParticles(
-          PLAYER_X + PLAYER_SIZE / 2,
-          playerY.current + PLAYER_SIZE / 2,
-          20,
-          "#4ade80",
-          8,
-        );
-        audioManager.playSound("powerupCustomer");
-        break;
       case "automation":
         speedBoost.current = 1.5;
         setTimeout(() => {
@@ -230,15 +207,17 @@ const GameScreen = ({
         }, 3000);
         break;
       case "knowledge_base":
-        combo.current += 5;
-        score.current += 1000;
-        createParticles(
-          PLAYER_X + PLAYER_SIZE / 2,
-          playerY.current + PLAYER_SIZE / 2,
-          15,
-          "#f59e0b",
-          7,
-        );
+        score.current += 250;
+        obstacles.current.forEach((obstacle) => {
+          createParticles(
+            obstacle.x + obstacle.width / 2,
+            obstacle.y + obstacle.height / 2,
+            15,
+            "#f59e0b",
+            7,
+          );
+        });
+        obstacles.current = [];
         audioManager.playSound("powerupKnowledge");
         break;
     }
@@ -251,19 +230,15 @@ const GameScreen = ({
     playerY.current = canvas.height - PLAYER_SIZE;
     playerVelocity.current = 0;
     score.current = 0;
-    ticketsResolved.current = 0;
-    customerSatisfaction.current = 100;
     gameSpeed.current = INITIAL_GAME_SPEED;
     obstacles.current = [];
     collectibles.current = [];
     particles.current = [];
-    powerUps.current = [];
     obstacleTimer.current = 0;
     collectibleTimer.current = 0;
     submitted.current = false;
     nextObstacleSpawn.current =
       Math.random() * (maxObstacleGap - minObstacleGap) + minObstacleGap;
-    combo.current = 0;
     canDoubleJump.current = true;
     isGrounded.current = true;
     invincible.current = false;
@@ -346,7 +321,15 @@ const GameScreen = ({
     if (!context) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.code === "Space") {
+      if (gameState === "gameOver") {
+        if (e.code === "Space") {
+          e.preventDefault();
+          restartGame();
+        } else if (e.code === "Escape") {
+          e.preventDefault();
+          endGame();
+        }
+      } else if (e.code === "Space") {
         e.preventDefault();
         handleJump();
       }
@@ -404,16 +387,6 @@ const GameScreen = ({
           `Final Score: ${score.current}`,
           canvas.width / 2,
           canvas.height / 2 - 20,
-        );
-        context.fillText(
-          `Tickets Resolved: ${ticketsResolved.current}`,
-          canvas.width / 2,
-          canvas.height / 2 + 20,
-        );
-        context.fillText(
-          `Customer Satisfaction: ${Math.round(customerSatisfaction.current)}%`,
-          canvas.width / 2,
-          canvas.height / 2 + 60,
         );
 
         context.restore();
@@ -475,13 +448,11 @@ const GameScreen = ({
 
       // Update game state
       score.current += Math.floor(300 * speedBoost.current * deltaTime);
-      if (combo.current > 0) {
-        score.current += Math.floor(combo.current * 120 * deltaTime);
-      }
 
       // Gradually increase difficulty
       gameSpeed.current =
-        Math.min(16, INITIAL_GAME_SPEED + score.current / 5000) * speedBoost.current;
+        Math.min(40, INITIAL_GAME_SPEED + score.current / 3000) *
+        speedBoost.current;
 
       // Update player physics
       playerVelocity.current += GRAVITY * 60 * deltaTime;
@@ -589,18 +560,6 @@ const GameScreen = ({
           }
 
           // Apply penalty based on obstacle type
-          switch (obstacle.type) {
-            case "angry_ticket":
-              customerSatisfaction.current -= 10;
-              break;
-            case "bug":
-              customerSatisfaction.current -= 15;
-              break;
-            case "escalation":
-              customerSatisfaction.current -= 20;
-              break;
-          }
-
           screenShake.current = 20;
           createParticles(playerCenterX, playerCenterY, 30, "#ef4444", 10);
           audioManager.playSound("death");
@@ -613,8 +572,6 @@ const GameScreen = ({
           obstacle.x + obstacle.width < PLAYER_X &&
           obstacle.x > lastObstacleX.current - 10
         ) {
-          combo.current++;
-          ticketsResolved.current++;
           createParticles(
             PLAYER_X + PLAYER_SIZE / 2,
             playerY.current + PLAYER_SIZE / 2,
@@ -684,65 +641,24 @@ const GameScreen = ({
       context.font = "bold 20px system-ui";
       context.textAlign = "left";
       context.fillText(`Score: ${score.current}`, 20, 30);
-      context.fillText(`Tickets Resolved: ${ticketsResolved.current}`, 20, 55);
-
-      context.textAlign = "center";
-      context.fillText(`Combo: x${combo.current}`, canvas.width / 2, 30);
-
-      context.textAlign = "right";
-      context.fillText(
-        `Satisfaction: ${Math.round(customerSatisfaction.current)}%`,
-        canvas.width - 20,
-        30,
-      );
-
-      // Draw satisfaction meter
-      const meterWidth = 150;
-      const meterX = canvas.width - 20 - meterWidth;
-      const meterY = 40;
-
-      context.strokeStyle = "#cbd5e1";
-      context.lineWidth = 2;
-      context.strokeRect(meterX, meterY, meterWidth, 20);
-
-      const satColor =
-        customerSatisfaction.current > 70
-          ? "#10b981"
-          : customerSatisfaction.current > 40
-            ? "#f59e0b"
-            : "#ef4444";
-      context.fillStyle = satColor;
-      context.fillRect(
-        meterX + 2,
-        meterY + 2,
-        (meterWidth - 4) * (customerSatisfaction.current / 100),
-        16,
-      );
 
       // Draw power-up indicators
+      const activePowerUps = [];
       if (invincible.current) {
-        context.fillStyle = "#a855f7";
-        context.font = "16px system-ui";
-        context.textAlign = "center";
-        context.fillText("🛡️ INVINCIBLE", canvas.width / 2, 55);
+        activePowerUps.push({ text: "🛡️ INVINCIBLE", color: "#a855f7" });
+      }
+      if (speedBoost.current > 1) {
+        activePowerUps.push({ text: "⚡ SPEED BOOST", color: "#3b82f6" });
       }
 
-      if (speedBoost.current > 1) {
-        context.fillStyle = "#3b82f6";
+      activePowerUps.forEach((powerUp, index) => {
+        context.fillStyle = powerUp.color;
         context.font = "16px system-ui";
         context.textAlign = "center";
-        context.fillText(
-          "⚡ SPEED BOOST",
-          canvas.width / 2,
-          speedBoost.current > 1 && invincible.current ? 75 : 55,
-        );
-      }
+        context.fillText(powerUp.text, canvas.width / 2, 55 + index * 20);
+      });
 
       // Decay combo
-      if (Math.random() < 0.6 * deltaTime) {
-        combo.current = Math.max(0, combo.current - 1);
-      }
-
       animationFrameId = requestAnimationFrame(gameLoop);
     };
 
@@ -766,6 +682,8 @@ const GameScreen = ({
     startGame,
     handleJump,
     activatePowerUp,
+    restartGame,
+    endGame,
   ]);
 
   return (
