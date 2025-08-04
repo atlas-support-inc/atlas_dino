@@ -9,6 +9,7 @@ const JUMP_STRENGTH = -12;
 const DOUBLE_JUMP_STRENGTH = -10;
 const PLAYER_SIZE = 40;
 const PLAYER_X = 100;
+const INITIAL_GAME_SPEED = 8;
 
 // Particle system for visual effects
 interface Particle {
@@ -78,7 +79,7 @@ const GameScreen = ({
   const score = useRef(0);
   const ticketsResolved = useRef(0);
   const customerSatisfaction = useRef(100);
-  const gameSpeed = useRef(4);
+  const gameSpeed = useRef(INITIAL_GAME_SPEED);
   const obstacles = useRef<Obstacle[]>([]);
   const collectibles = useRef<Collectible[]>([]);
   const particles = useRef<Particle[]>([]);
@@ -108,6 +109,7 @@ const GameScreen = ({
 
   // Audio state
   const hasStartedAudio = useRef(false);
+  const lastTime = useRef(0);
 
   const addScore = useMutation(api.myFunctions.addScore);
 
@@ -251,7 +253,7 @@ const GameScreen = ({
     score.current = 0;
     ticketsResolved.current = 0;
     customerSatisfaction.current = 100;
-    gameSpeed.current = 4;
+    gameSpeed.current = INITIAL_GAME_SPEED;
     obstacles.current = [];
     collectibles.current = [];
     particles.current = [];
@@ -268,6 +270,7 @@ const GameScreen = ({
     speedBoost.current = 1;
     screenShake.current = 0;
     playerRotation.current = 0;
+    lastTime.current = 0;
     hasStartedAudio.current = false;
     setGameState("playing");
     setShowInstructions(false);
@@ -364,7 +367,16 @@ const GameScreen = ({
 
     let animationFrameId: number;
 
-    const gameLoop = () => {
+    const gameLoop = (currentTime: number) => {
+      if (lastTime.current === 0) {
+        lastTime.current = currentTime;
+        animationFrameId = requestAnimationFrame(gameLoop);
+        return;
+      }
+
+      const deltaTime = (currentTime - lastTime.current) / 1000; // in seconds
+      lastTime.current = currentTime;
+
       if (gameState !== "playing") {
         // Draw game over screen with enhanced stats
         const shakeX =
@@ -462,18 +474,19 @@ const GameScreen = ({
       }
 
       // Update game state
-      score.current += Math.floor(5 * speedBoost.current);
+      score.current += Math.floor(300 * speedBoost.current * deltaTime);
       if (combo.current > 0) {
-        score.current += combo.current * 2;
+        score.current += Math.floor(combo.current * 120 * deltaTime);
       }
 
       // Gradually increase difficulty
       gameSpeed.current =
-        Math.min(12, 4 + score.current / 5000) * speedBoost.current;
+        Math.min(16, INITIAL_GAME_SPEED + score.current / 5000) * speedBoost.current;
 
       // Update player physics
-      playerVelocity.current += GRAVITY;
-      playerY.current += playerVelocity.current;
+      playerVelocity.current += GRAVITY * 60 * deltaTime;
+      playerY.current += playerVelocity.current * 60 * deltaTime;
+
 
       // Ground collision
       if (playerY.current > canvas.height - PLAYER_SIZE) {
@@ -485,7 +498,7 @@ const GameScreen = ({
 
       // Update rotation
       if (!isGrounded.current) {
-        playerRotation.current += 2;
+        playerRotation.current += 120 * deltaTime;
       }
 
       // Clear canvas with a solid color for better performance
@@ -517,8 +530,8 @@ const GameScreen = ({
       context.restore();
 
       // Spawn obstacles
-      obstacleTimer.current++;
-      if (obstacleTimer.current >= nextObstacleSpawn.current) {
+      obstacleTimer.current += deltaTime;
+      if (obstacleTimer.current >= nextObstacleSpawn.current / 60) {
         addObstacle();
         obstacleTimer.current = 0;
 
@@ -531,15 +544,15 @@ const GameScreen = ({
       }
 
       // Spawn collectibles
-      collectibleTimer.current++;
-      if (collectibleTimer.current >= 180) {
+      collectibleTimer.current += deltaTime;
+      if (collectibleTimer.current >= 3) {
         addCollectible();
         collectibleTimer.current = 0;
       }
 
       // Update and draw obstacles
       obstacles.current = obstacles.current.filter((obstacle) => {
-        obstacle.x -= gameSpeed.current;
+        obstacle.x -= gameSpeed.current * 60 * deltaTime;
 
         // Draw obstacle
         context.font = `${obstacle.height}px system-ui`;
@@ -650,10 +663,10 @@ const GameScreen = ({
 
       // Update and draw particles
       particles.current = particles.current.filter((particle) => {
-        particle.x += particle.vx;
-        particle.y += particle.vy;
-        particle.vy += 0.2;
-        particle.life--;
+        particle.x += particle.vx * 60 * deltaTime;
+        particle.y += particle.vy * 60 * deltaTime;
+        particle.vy += 0.2 * 60 * deltaTime;
+        particle.life -= 60 * deltaTime;
 
         context.fillStyle = particle.color;
         context.globalAlpha = particle.life / 30;
@@ -726,7 +739,7 @@ const GameScreen = ({
       }
 
       // Decay combo
-      if (Math.random() < 0.01) {
+      if (Math.random() < 0.6 * deltaTime) {
         combo.current = Math.max(0, combo.current - 1);
       }
 
@@ -734,7 +747,8 @@ const GameScreen = ({
     };
 
     if (gameState === "playing") {
-      gameLoop();
+      lastTime.current = 0;
+      animationFrameId = requestAnimationFrame(gameLoop);
     }
 
     return () => {
