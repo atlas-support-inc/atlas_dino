@@ -1,6 +1,7 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
 import { useMutation } from 'convex/react';
 import { api } from '../convex/_generated/api';
+import { audioManager } from './utils/audioManager';
 
 // Game constants
 const GRAVITY = 0.5;
@@ -54,6 +55,8 @@ const GameScreen = ({ endGame, playerInfo }: { endGame: () => void; playerInfo: 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [gameState, setGameState] = useState<'playing' | 'gameOver'>('playing');
   const [showInstructions, setShowInstructions] = useState(true);
+  const [musicEnabled, setMusicEnabled] = useState(audioManager.isMusicEnabled());
+  const [soundsEnabled, setSoundsEnabled] = useState(audioManager.areSoundsEnabled());
 
   // Enhanced game state
   const playerY = useRef(0);
@@ -81,6 +84,9 @@ const GameScreen = ({ endGame, playerInfo }: { endGame: () => void; playerInfo: 
   // Visual effects
   const screenShake = useRef(0);
   const playerRotation = useRef(0);
+  
+  // Audio state
+  const hasStartedAudio = useRef(false);
 
   const addScore = useMutation(api.myFunctions.addScore);
 
@@ -147,21 +153,29 @@ const GameScreen = ({ endGame, playerInfo }: { endGame: () => void; playerInfo: 
         customerSatisfaction.current = Math.min(100, customerSatisfaction.current + 20);
         score.current += 500;
         createParticles(PLAYER_X + PLAYER_SIZE/2, playerY.current + PLAYER_SIZE/2, 20, '#4ade80', 8);
+        audioManager.playSound('powerupCustomer');
         break;
       case 'automation':
         speedBoost.current = 1.5;
         setTimeout(() => { speedBoost.current = 1; }, 5000);
         createParticles(PLAYER_X + PLAYER_SIZE/2, playerY.current + PLAYER_SIZE/2, 15, '#3b82f6', 6);
+        audioManager.playSound('powerupAutomation');
+        audioManager.playMusic('speedBoost');
+        setTimeout(() => { audioManager.playMusic('background'); }, 5000);
         break;
       case 'ai_assist':
         invincible.current = true;
         setTimeout(() => { invincible.current = false; }, 3000);
         createParticles(PLAYER_X + PLAYER_SIZE/2, playerY.current + PLAYER_SIZE/2, 25, '#a855f7', 10);
+        audioManager.playSound('powerupAI');
+        audioManager.playMusic('invincible');
+        setTimeout(() => { audioManager.playMusic('background'); }, 3000);
         break;
       case 'knowledge_base':
         combo.current += 5;
         score.current += 1000;
         createParticles(PLAYER_X + PLAYER_SIZE/2, playerY.current + PLAYER_SIZE/2, 15, '#f59e0b', 7);
+        audioManager.playSound('powerupKnowledge');
         break;
     }
   };
@@ -190,6 +204,7 @@ const GameScreen = ({ endGame, playerInfo }: { endGame: () => void; playerInfo: 
     speedBoost.current = 1;
     screenShake.current = 0;
     playerRotation.current = 0;
+    hasStartedAudio.current = false;
     setGameState('playing');
     setShowInstructions(false);
   }, []);
@@ -197,6 +212,23 @@ const GameScreen = ({ endGame, playerInfo }: { endGame: () => void; playerInfo: 
   const restartGame = useCallback(() => {
     startGame();
   }, [startGame]);
+
+  const toggleMusic = useCallback(() => {
+    const newMusicEnabled = !musicEnabled;
+    setMusicEnabled(newMusicEnabled);
+    audioManager.setMusicEnabled(newMusicEnabled);
+    if (!newMusicEnabled) {
+      audioManager.stopMusic(true);
+    } else if (gameState === 'playing') {
+      audioManager.playMusic('background');
+    }
+  }, [musicEnabled, gameState]);
+
+  const toggleSounds = useCallback(() => {
+    const newSoundsEnabled = !soundsEnabled;
+    setSoundsEnabled(newSoundsEnabled);
+    audioManager.setSoundsEnabled(newSoundsEnabled);
+  }, [soundsEnabled]);
 
   const handleJump = useCallback(() => {
     if (gameState !== 'playing') return;
@@ -206,17 +238,25 @@ const GameScreen = ({ endGame, playerInfo }: { endGame: () => void; playerInfo: 
       return;
     }
 
+    // Start background music on first user interaction
+    if (!hasStartedAudio.current) {
+      hasStartedAudio.current = true;
+      audioManager.playMusic('background', true);
+    }
+
     if (isGrounded.current) {
       playerVelocity.current = JUMP_STRENGTH;
       isGrounded.current = false;
       canDoubleJump.current = true;
       playerRotation.current = -15;
       createParticles(PLAYER_X + PLAYER_SIZE / 2, playerY.current + PLAYER_SIZE, 5, '#60a5fa', 3);
+      audioManager.playSound('jump');
     } else if (canDoubleJump.current) {
       playerVelocity.current = DOUBLE_JUMP_STRENGTH;
       canDoubleJump.current = false;
       playerRotation.current = -20;
       createParticles(PLAYER_X + PLAYER_SIZE / 2, playerY.current + PLAYER_SIZE / 2, 8, '#818cf8', 4);
+      audioManager.playSound('doubleJump');
     }
   }, [gameState, showInstructions]);
 
@@ -418,6 +458,8 @@ const GameScreen = ({ endGame, playerInfo }: { endGame: () => void; playerInfo: 
           
           screenShake.current = 20;
           createParticles(playerCenterX, playerCenterY, 30, '#ef4444', 10);
+          audioManager.playSound('death');
+          audioManager.playMusic('gameOver');
           setGameState('gameOver');
         }
         
@@ -426,6 +468,7 @@ const GameScreen = ({ endGame, playerInfo }: { endGame: () => void; playerInfo: 
           combo.current++;
           ticketsResolved.current++;
           createParticles(PLAYER_X + PLAYER_SIZE/2, playerY.current + PLAYER_SIZE/2, 10, '#10b981', 5);
+          audioManager.playSound('dodge');
         }
         
         lastObstacleX.current = obstacle.x;
@@ -541,6 +584,7 @@ const GameScreen = ({ endGame, playerInfo }: { endGame: () => void; playerInfo: 
       window.removeEventListener('keydown', handleKeyDown);
       canvas.removeEventListener('mousedown', handleMouseDown);
       canvas.removeEventListener('touchstart', handleTouchStart);
+      audioManager.stopMusic();
     };
   }, [gameState, showInstructions, addScore, playerInfo, startGame, handleJump]);
 
@@ -553,6 +597,31 @@ const GameScreen = ({ endGame, playerInfo }: { endGame: () => void; playerInfo: 
           height={500} 
           className="border-2 border-gray-300 rounded-lg shadow-lg"
         />
+        {/* Audio Controls */}
+        <div className="absolute top-2 right-2 flex gap-2">
+          <button
+            onClick={toggleMusic}
+            className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+              musicEnabled 
+                ? 'bg-blue-500 text-white hover:bg-blue-600' 
+                : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
+            }`}
+            title={musicEnabled ? 'Turn off music' : 'Turn on music'}
+          >
+            🎵
+          </button>
+          <button
+            onClick={toggleSounds}
+            className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+              soundsEnabled 
+                ? 'bg-green-500 text-white hover:bg-green-600' 
+                : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
+            }`}
+            title={soundsEnabled ? 'Turn off sounds' : 'Turn on sounds'}
+          >
+            🔊
+          </button>
+        </div>
       </div>
       {gameState === 'gameOver' && (
         <div className="flex gap-4">
