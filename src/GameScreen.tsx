@@ -174,6 +174,8 @@ const GameScreen = ({
         speedBoost.current = 1.5;
         setTimeout(() => {
           speedBoost.current = 1;
+          audioManager.stopSpecificMusic("speedBoost");
+          audioManager.playMusic("background");
         }, 5000);
         createParticles(
           PLAYER_X + PLAYER_SIZE / 2,
@@ -183,15 +185,15 @@ const GameScreen = ({
           6,
         );
         audioManager.playSound("powerupAutomation");
+        audioManager.stopSpecificMusic("invincible"); // Stop any other powerup music
         audioManager.playMusic("speedBoost");
-        setTimeout(() => {
-          audioManager.playMusic("background");
-        }, 5000);
         break;
       case "ai_assist":
         invincible.current = true;
         setTimeout(() => {
           invincible.current = false;
+          audioManager.stopSpecificMusic("invincible");
+          audioManager.playMusic("background");
         }, 3000);
         createParticles(
           PLAYER_X + PLAYER_SIZE / 2,
@@ -201,10 +203,8 @@ const GameScreen = ({
           10,
         );
         audioManager.playSound("powerupAI");
+        audioManager.stopSpecificMusic("speedBoost"); // Stop any other powerup music
         audioManager.playMusic("invincible");
-        setTimeout(() => {
-          audioManager.playMusic("background");
-        }, 3000);
         break;
       case "knowledge_base":
         score.current += 250;
@@ -219,6 +219,7 @@ const GameScreen = ({
         });
         obstacles.current = [];
         audioManager.playSound("powerupKnowledge");
+        // Knowledge base doesn't change music - it's an instant effect
         break;
     }
   };
@@ -247,6 +248,11 @@ const GameScreen = ({
     playerRotation.current = 0;
     lastTime.current = 0;
     hasStartedAudio.current = false;
+    
+    // Stop all powerup music when starting
+    audioManager.stopSpecificMusic("speedBoost");
+    audioManager.stopSpecificMusic("invincible");
+    
     setGameState("playing");
     setShowInstructions(false);
   }, []);
@@ -672,7 +678,7 @@ const GameScreen = ({
       window.removeEventListener("keydown", handleKeyDown);
       canvas.removeEventListener("mousedown", handleMouseDown);
       canvas.removeEventListener("touchstart", handleTouchStart);
-      audioManager.stopMusic();
+      audioManager.stopAllMusic();
     };
   }, [
     gameState,

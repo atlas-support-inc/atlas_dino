@@ -22,6 +22,7 @@ class AudioManager {
   private soundVolume: number = 0.7;
   private musicEnabled: boolean = true;
   private soundsEnabled: boolean = true;
+  private powerupTimeouts: Set<NodeJS.Timeout> = new Set();
 
   constructor() {
     this.loadAudio();
@@ -42,7 +43,7 @@ class AudioManager {
     const musicFiles: Record<MusicTrack, string> = {
       background: '/audio/background.mp3',
       speedBoost: '/audio/speed-boost.mp3',
-      invincible: '/audio/invincible.mp3',
+      invincible: '/audio/powerup-ai.mp3', // Use existing powerup-ai.mp3 for invincible music
       gameOver: '/audio/game-over.mp3',
     };
 
@@ -74,11 +75,13 @@ class AudioManager {
     if (!this.soundsEnabled) return;
     
     const audio = this.sounds.get(effect);
-    if (audio) {
+    if (audio && audio.src) { // Check if audio file was loaded successfully
       audio.currentTime = 0;
       audio.play().catch(() => {
         console.warn(`Failed to play sound: ${effect}`);
       });
+    } else {
+      console.warn(`Sound effect not available: ${effect}`);
     }
   }
 
@@ -91,7 +94,7 @@ class AudioManager {
     }
 
     const audio = this.music.get(track);
-    if (audio) {
+    if (audio && audio.src) { // Check if audio file was loaded successfully
       if (fadeIn) {
         audio.volume = 0;
         audio.play().catch(() => {
@@ -105,6 +108,8 @@ class AudioManager {
         });
       }
       this.currentMusic = audio;
+    } else {
+      console.warn(`Music track not available: ${track}`);
     }
   }
 
@@ -117,6 +122,45 @@ class AudioManager {
         this.currentMusic.currentTime = 0;
         this.currentMusic = null;
       }
+    }
+  }
+
+  stopSpecificMusic(track: MusicTrack) {
+    const audio = this.music.get(track);
+    if (audio) {
+      audio.pause();
+      audio.currentTime = 0;
+      if (this.currentMusic === audio) {
+        this.currentMusic = null;
+      }
+    }
+  }
+
+  stopAllMusic() {
+    this.music.forEach(audio => {
+      audio.pause();
+      audio.currentTime = 0;
+    });
+    this.currentMusic = null;
+  }
+
+  transitionToMusic(track: MusicTrack, delay: number = 0) {
+    if (!this.musicEnabled) return;
+
+    // Clear any existing powerup timeouts
+    this.powerupTimeouts.forEach(timeout => clearTimeout(timeout));
+    this.powerupTimeouts.clear();
+
+    if (delay > 0) {
+      const timeout = setTimeout(() => {
+        this.stopMusic();
+        this.playMusic(track);
+        this.powerupTimeouts.delete(timeout);
+      }, delay);
+      this.powerupTimeouts.add(timeout);
+    } else {
+      this.stopMusic();
+      this.playMusic(track);
     }
   }
 
@@ -179,8 +223,11 @@ class AudioManager {
 
   setMusicEnabled(enabled: boolean) {
     this.musicEnabled = enabled;
-    if (!enabled && this.currentMusic) {
-      this.stopMusic(true);
+    if (!enabled) {
+      this.stopAllMusic();
+      // Clear any pending powerup timeouts
+      this.powerupTimeouts.forEach(timeout => clearTimeout(timeout));
+      this.powerupTimeouts.clear();
     }
   }
 
